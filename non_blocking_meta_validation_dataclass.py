@@ -69,7 +69,7 @@ class NonBlockingValidationDataclass:
                 formatting_errors.append(err)
 
             try:
-                if not field.metadata.get('input_field'):
+                if not field.metadata.get('input_field') and field.name not in dict_data:
                     raise AttributeError(f'Field {field.name} has no input_field attribute in field metadata')
             except AttributeError as err:
                 formatting_errors.append(err)
