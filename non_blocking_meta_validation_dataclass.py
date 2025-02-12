@@ -60,14 +60,20 @@ class NonBlockingValidationDataclass:
 
         Возвращает провалидированный инстанс датакласса со всеми вложенными датаклассами.
         """
-        # TODO: CHECK EACH FIELD IS FORMATTED CORRECTLY: metadata, validator, input_field
         formatting_errors = []
         for field in fields(cls):
             try:
-                field.metadata.get('validator')
-                field.metadata.get('input_field')
+                if not field.metadata.get('validator'):
+                    raise AttributeError(f'Field {field.name} has no validator attribute in field metadata')
             except AttributeError as err:
                 formatting_errors.append(err)
+
+            try:
+                if not field.metadata.get('input_field'):
+                    raise AttributeError(f'Field {field.name} has no input_field attribute in field metadata')
+            except AttributeError as err:
+                formatting_errors.append(err)
+
         if formatting_errors:
             raise ValidationExceptionGroup("Formating Errors", formatting_errors)
 
