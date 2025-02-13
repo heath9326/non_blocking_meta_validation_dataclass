@@ -99,7 +99,7 @@ class NonBlockingValidationDataclass:
     @classmethod
     def _validate_field_formatting(cls, dataclass_field: field, dict_data: dict):
         field_formatting_errors = []
-
+        # FIXME: Max recursion depth reached ERROR
         try:
             if not dataclass_field.metadata.get('validator'):
                 raise AttributeError(f'Field {dataclass_field.name} has no validator attribute in field metadata')
