@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
+from typing import List, Any
 
 
 class ValidationExceptionGroup(ExceptionGroup):
@@ -27,10 +28,10 @@ class NonBlockingValidationDataclass:
 
     def convert_value(self, value):
         if isinstance(value, NonBlockingValidationDataclass):
-            # Рекурсивно сериализируем вложенные датаклассы
+            # Recursively serialize nested dataclasses
             return value.as_dict()
         elif isinstance(value, list):
-            # Обрабатываем списки
+            # Handle lists
             return [self.convert_value(item) for item in value]
         else:
             return value
@@ -51,28 +52,84 @@ class NonBlockingValidationDataclass:
 
         return obj_dict
 
+    # @staticmethod
+    # def flat_dict_only_leaf_values(d):
+    #     """
+    #     Flatten the dict to only have leaf values:
+    #     data = {                                              data = {
+    #         'field_01': 'Example',                                'field_01': 'Example',
+    #         'field_02': 10,                                       'field_02': 10,
+    #         'field_03': {                                         'nested_field_01': 'Example',
+    #             'nested_field_01': 'Example',       =>            'nested_field_02': 10,
+    #             'nested_field_02': 10                             'field_04': [0, 1, 2]
+    #         },                                                }
+    #         'field_04': [0, 1, 2]
+    #     }
+    #     """
+    #     def _flatten_dict(d):
+    #         items = []
+    #         for k, v in d.items():
+    #             if isinstance(v, dict):
+    #                 items.extend(_flatten_dict(v).items())
+    #             else:
+    #                 items.append((k, v))
+    #         return dict(items)
+    #
+    #     return _flatten_dict(d)
     @classmethod
-    def from_dict(cls, dict_data):
+    def flatten_list_recursive(cls, list_to_flatten: List[Any]) -> List[Any]:
         """
-        Метод для валидации входящей даты через датакласс
+        Recursively flatten list of lists
+        [element1, [element2, element3, [element4]]  ->->->   [element1, element2, element3, element4]
+        """
+        flattened_list = []
+        for item in list_to_flatten:
+            if isinstance(item, list):
+                flattened_list.extend(cls.flatten_list_recursive(item))
+            else:
+                flattened_list.append(item)
+        return flattened_list
 
+    @staticmethod
+    def _get_field_type(dataclass_field: field) -> type:
+        if hasattr(dataclass_field, "__origin__"):
+            return dataclass_field.__origin__
+        return dataclass_field.type
+
+    @classmethod
+    def _validate_field_formatting(cls, dataclass_field: field, dict_data: dict):
+        field_formatting_errors = []
+
+        try:
+            if not dataclass_field.metadata.get('validator'):
+                raise AttributeError(f'Field {dataclass_field.name} has no validator attribute in field metadata')
+        except AttributeError as err:
+            field_formatting_errors.append(err)
+
+        try:
+            if not dataclass_field.metadata.get('input_field') and dataclass_field.name not in dict_data:
+                raise AttributeError(f'Field {dataclass_field.name} has no input_field attribute in field metadata')
+        except AttributeError as err:
+            field_formatting_errors.append(err)
+
+        field_type = cls._get_field_type(dataclass_field)
+        if isinstance(field_type, type) and issubclass(field_type, NonBlockingValidationDataclass):
+            nested_field_formatting_errors = field_type._validate_field_formatting(dataclass_field, dict_data)
+            field_formatting_errors.extend(nested_field_formatting_errors)
+
+        return field_formatting_errors
+
+    @classmethod
+    def from_dict(cls, dict_data: dict):
+        """
+        Validate input_data and get formatted dataclass with all nested dataclasses and properties via one function:
+
+        Usage:
         validated_dataclass = Dataclass.from_dict(dict_data)
-
-        Возвращает провалидированный инстанс датакласса со всеми вложенными датаклассами.
         """
-        formatting_errors = []
-        for field in fields(cls):
-            try:
-                if not field.metadata.get('validator'):
-                    raise AttributeError(f'Field {field.name} has no validator attribute in field metadata')
-            except AttributeError as err:
-                formatting_errors.append(err)
-
-            try:
-                if not field.metadata.get('input_field') and field.name not in dict_data:
-                    raise AttributeError(f'Field {field.name} has no input_field attribute in field metadata')
-            except AttributeError as err:
-                formatting_errors.append(err)
+        formatting_errors = cls.flatten_list_recursive(
+            [cls._validate_field_formatting(dataclass_field, dict_data) for dataclass_field in fields(cls)]
+        )
 
         if formatting_errors:
             raise ValidationExceptionGroup("Formating Errors", formatting_errors)
@@ -82,11 +139,17 @@ class NonBlockingValidationDataclass:
 
         for field in fields(cls):
             field_name = field.name
-            value = dict_data.get(field_name)
-            validator: AttrValidator = field.metadata.get('validator')
 
+            is_metadata_input_field_provided = field.metadata.get('input_field')
+            if is_metadata_input_field_provided:
+                value = dict_data.get(is_metadata_input_field_provided)
+            else:
+                value = dict_data.get(field_name)
+
+            validator: AttrValidator = field.metadata.get('validator')
             if validator:
                 try:
+                    validator(value)()
                     setattr(instance, field_name, value)
                 except ValueError as e:
                     validation_errors.append(e)
