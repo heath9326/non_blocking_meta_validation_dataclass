@@ -71,10 +71,9 @@ class TestFormatting(TestCase):
             attr_06: dict = field(default=None, metadata={'validator': BasicDictFieldValidator})                           # CORRECT: validator is present, key of this name IS in input_data
 
         EXPECTED_ERRORS = (
-            'Field attr_03 has no validator attribute in field metadata',
-            'Field attr_05 has no validator attribute in field metadata',
-            'Field attr_05 has no input_field attribute in field metadata'
-        )
+            "Field 'attr_03' has no validator attribute in field metadata",
+            "Field 'attr_05' has no validator attribute in field metadata",
+            "Field 'attr_05' has no input_field attribute in field metadata and field 'attr_05' not present in input data.")
 
         data = {
             'attr_01': 'example string',
@@ -125,16 +124,17 @@ class TestFormatting(TestCase):
         """
         @dataclass
         class DoubleNestedDataclass(NonBlockingValidationDataclass):
-            attr_05: int = field(default=None, metadata={'validator': BasicDictFieldValidator})
+            attr_05: int = field(default=None, metadata={'validator': BasicDictFieldValidator})                             # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
+            double_nested_field_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})            # ERROR: Validator present, NO 'input_field' AND key with the same name NOT in input_data
 
         @dataclass
         class NestedDataclass(NonBlockingValidationDataclass):
-            nested_field_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})
-            nested_field_02: DoubleNestedDataclass = field(default=None, metadata={'validator': BasicStringFieldValidator})
+            nested_field_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})                   #ERROR: Validator present, NO 'input_field' AND key with the same name NOT in input_data
+            nested_field_02: DoubleNestedDataclass = DoubleNestedDataclass
 
         @dataclass
         class DataclassForFormatterCorrect(NonBlockingValidationDataclass):
-            attr_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})                           # CORRECT: validator present, NO 'input_field' AND but key with the same name IS in input_data
+            attr_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})                           # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
             attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_01'})  # CORRECT: both attributes present, input field matches the attr name
             attr_03: NestedDataclass = NestedDataclass
 
@@ -146,7 +146,10 @@ class TestFormatting(TestCase):
             'attr_07': {'example_key': 'example_value'},
         }
 
-        EXPECTED_ERRORS = set()
+        EXPECTED_ERRORS = (
+            "Field 'nested_field_01' has no input_field attribute in field metadata and field 'nested_field_01' not present in input data.",
+            "Field 'double_nested_field_01' has no input_field attribute in field metadata and field 'double_nested_field_01' not present in input data."
+        )
 
         with self.assertRaises(ValidationExceptionGroup) as context:
             DataclassForFormatterCorrect.from_dict(data)

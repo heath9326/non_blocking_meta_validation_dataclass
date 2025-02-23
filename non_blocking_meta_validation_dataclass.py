@@ -99,22 +99,27 @@ class NonBlockingValidationDataclass:
     @classmethod
     def _validate_field_formatting(cls, dataclass_field: field, dict_data: dict):
         field_formatting_errors = []
-        # FIXME: Max recursion depth reached ERROR
-        try:
-            if not dataclass_field.metadata.get('validator'):
-                raise AttributeError(f'Field {dataclass_field.name} has no validator attribute in field metadata')
-        except AttributeError as err:
-            field_formatting_errors.append(err)
-
-        try:
-            if not dataclass_field.metadata.get('input_field') and dataclass_field.name not in dict_data:
-                raise AttributeError(f'Field {dataclass_field.name} has no input_field attribute in field metadata')
-        except AttributeError as err:
-            field_formatting_errors.append(err)
-
         field_type = cls._get_field_type(dataclass_field)
+
+        if not issubclass(field_type, NonBlockingValidationDataclass):
+            try:
+                if not dataclass_field.metadata.get('validator'):
+                    raise AttributeError(f"Field '{dataclass_field.name}' has no validator attribute in field metadata")
+            except AttributeError as err:
+                field_formatting_errors.append(err)
+
+            try:
+                if not dataclass_field.metadata.get('input_field') and dataclass_field.name not in dict_data:
+                    raise AttributeError(f"Field '{dataclass_field.name}' has no input_field attribute in field metadata "
+                                         f"and field '{dataclass_field.name}' not present in input data.")
+            except AttributeError as err:
+                field_formatting_errors.append(err)
+
         if isinstance(field_type, type) and issubclass(field_type, NonBlockingValidationDataclass):
-            nested_field_formatting_errors = field_type._validate_field_formatting(dataclass_field, dict_data)
+            nested_field_formatting_errors = [
+                cls._validate_field_formatting(nested_dataclass_field, dict_data) for nested_dataclass_field
+                in fields(field_type)
+            ]
             field_formatting_errors.extend(nested_field_formatting_errors)
 
         return field_formatting_errors
