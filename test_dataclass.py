@@ -114,7 +114,7 @@ class TestFormatting(TestCase):
         result_dataclass = DataclassForFormatterCorrect.from_dict(data)
         self.assertIsInstance(result_dataclass, DataclassForFormatterCorrect)
 
-    def test_dataclass_formatter_correctly_with_nested_dataclass_fields__should_return_dataclass_instance(self):
+    def test_dataclass_formatter_incorrectly_with_nested_dataclass_fields__should_raise_validation_errors(self):
         """
         All fields are formatter correctly:
            - have 'validator'
@@ -155,3 +155,44 @@ class TestFormatting(TestCase):
             DataclassForFormatterCorrect.from_dict(data)
 
         self.assertEqual(EXPECTED_ERRORS, self.extract_verbose_errors_from_exception_groups(context))
+
+    def test_dataclass_formatter_correctly_with_nested_dataclass_fields__should_return_dataclass_instance(self):
+        """
+        All fields are formatter correctly:
+           - have 'validator'
+           - 'input_field' in metadata or key of the same name is present in input_data
+        Otherwise raise  ExceptionGroup exception with all the exceptions for each field present.
+        :return: validated formatted dataclass with nested dataclass fields
+        """
+
+        @dataclass
+        class DoubleNestedDataclass(NonBlockingValidationDataclass):
+            attr_05: int = field(default=None, metadata={
+                'validator': BasicDictFieldValidator})                                                                    # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
+            double_nested_field_01: str = field(default=None, metadata={
+                'validator': BasicStringFieldValidator, 'input_field': 'attr_01'})                                        # CORRECT: Validator present, input field is present in input data
+
+        @dataclass
+        class NestedDataclass(NonBlockingValidationDataclass):
+            nested_field_01: str = field(default=None, metadata={
+                'validator': BasicStringFieldValidator})                                                                  # CORRECT: Validator present, NO 'input_field' BUT key with the same name IS in input_data
+            nested_field_02: DoubleNestedDataclass = DoubleNestedDataclass
+
+        @dataclass
+        class DataclassForFormatterCorrect(NonBlockingValidationDataclass):
+            attr_01: str = field(default=None, metadata={
+                'validator': BasicStringFieldValidator})                                                                  # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
+            attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_01'})# CORRECT: both attributes present, input field matches the attr name
+            attr_03: NestedDataclass = NestedDataclass
+
+        data = {
+            'attr_01': 'example string',
+            'attr_02': {'example_key': 'example_value'},
+            'attr_04': {'example_key': 'example_value'},
+            'attr_05': 123,
+            'attr_07': {'example_key': 'example_value'},
+            'nested_field_01': 'example string',
+        }
+
+        result_dataclass = DataclassForFormatterCorrect.from_dict(data)
+        self.assertIsInstance(result_dataclass, DataclassForFormatterCorrect)

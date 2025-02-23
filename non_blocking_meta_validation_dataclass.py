@@ -122,6 +122,8 @@ class NonBlockingValidationDataclass:
             ]
             field_formatting_errors.extend(nested_field_formatting_errors)
 
+        #TODO: Add validation though custom validator
+        #TODO: Make custom Validator optional - use strict type validation in validator not included
         return field_formatting_errors
 
     @classmethod
@@ -163,3 +165,8 @@ class NonBlockingValidationDataclass:
             raise ValidationExceptionGroup("Validation Errors", validation_errors)
 
         return instance
+
+    @classmethod
+    def to_dist(cls):
+        # TODO: Add reverse serialization into a dict
+        pass
