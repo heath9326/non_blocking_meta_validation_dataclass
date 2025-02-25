@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, field
-from typing import List, Any
+from typing import List, Any, Type
+
+from rest_framework.exceptions import ValidationError
 
 
 class ValidationExceptionGroup(ExceptionGroup):
@@ -9,12 +11,14 @@ class ValidationExceptionGroup(ExceptionGroup):
 
 class AttrValidator(ABC):
 
-    def __init__(self, value):
+    def __init__(self, value, field_name: str):
         self.value = value
+        self.field_name = field_name
 
-    @abstractmethod
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError
+    def __call__(self, type: Type, *args, **kwargs):
+        if not isinstance(self.value, type):
+            raise ValidationError(f"Field: {self.field_name} raised ValidationError. "
+                                  f"Value: '{self.value}' is not of type: {type}")
 
 
 @dataclass
@@ -147,7 +151,7 @@ class NonBlockingValidationDataclass:
         for field in fields(cls):
             field_name = field.name
 
-            is_metadata_input_field_provided = field.metadata.get('input_field')
+            is_metadata_input_field_provided = field.metadata.get('input_field', False)
             if is_metadata_input_field_provided:
                 value = dict_data.get(is_metadata_input_field_provided)
             else:
@@ -156,9 +160,9 @@ class NonBlockingValidationDataclass:
             validator: AttrValidator = field.metadata.get('validator')
             if validator:
                 try:
-                    validator(value)()
+                    validator(value, field_name)()
                     setattr(instance, field_name, value)
-                except ValueError as e:
+                except ValidationError as e:
                     validation_errors.append(e)
 
         if validation_errors:
@@ -167,6 +171,6 @@ class NonBlockingValidationDataclass:
         return instance
 
     @classmethod
-    def to_dist(cls):
+    def to_dict(cls):
         # TODO: Add reverse serialization into a dict
         pass

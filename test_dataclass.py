@@ -11,21 +11,24 @@ from non_blocking_meta_validation_dataclass import (
 
 
 class BasicIntFieldValidator(AttrValidator):
+    type = int
 
     def __call__(self, *args, **kwargs):
-        pass
+        super().__call__(self.type)
 
 
 class BasicDictFieldValidator(AttrValidator):
+    type = dict
 
     def __call__(self, *args, **kwargs):
-        pass
+        super().__call__(self.type)
 
 
 class BasicStringFieldValidator(AttrValidator):
+    type = str
 
     def __call__(self, *args, **kwargs):
-        pass
+        super().__call__(self.type)
 
 
 @dataclass
@@ -98,10 +101,10 @@ class TestFormatting(TestCase):
         @dataclass
         class DataclassForFormatterCorrect(NonBlockingValidationDataclass):
             attr_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})                          # CORRECT: validator present, NO 'input_field' AND but key with the same name IS in input_data
-            attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_01'}) # CORRECT: both attributes present, input field matches the attr name
-            attr_03: int = field(default=None, metadata={'validator': BasicIntFieldValidator, 'input_field': 'attr_06'})   # CORRECT: validator is present, custom input_field is present and present in input_data
+            attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_04'}) # CORRECT: both attributes present, input field matches the attr name
+            attr_03: int = field(default=None, metadata={'validator': BasicIntFieldValidator, 'input_field': 'attr_05'})   # CORRECT: validator is present, custom input_field is present and present in input_data
             attr_04: dict = field(default=None, metadata={'validator': BasicDictFieldValidator})                           # CORRECT: validator present, input_field is missing in metadata, but key with the same name in input_data
-            attr_05: int = field(default=None, metadata={'validator': BasicDictFieldValidator})                            # CORRECT: validator is present, input_field is missing in metadata, but key with the same name in input_data
+            attr_05: int = field(default=None, metadata={'validator': BasicIntFieldValidator})                            # CORRECT: validator is present, input_field is missing in metadata, but key with the same name in input_data
 
         data = {
             'attr_01': 'example string',
@@ -167,22 +170,27 @@ class TestFormatting(TestCase):
 
         @dataclass
         class DoubleNestedDataclass(NonBlockingValidationDataclass):
-            attr_05: int = field(default=None, metadata={
-                'validator': BasicDictFieldValidator})                                                                    # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
-            double_nested_field_01: str = field(default=None, metadata={
-                'validator': BasicStringFieldValidator, 'input_field': 'attr_01'})                                        # CORRECT: Validator present, input field is present in input data
+            attr_05: int = field(                                                                                       # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
+                default=None,
+                metadata={'validator': BasicDictFieldValidator}
+            )
+            double_nested_field_01: str = field(                                                                        # CORRECT: Validator present, input field is present in input data
+                default=None,
+                metadata={'validator': BasicStringFieldValidator, 'input_field': 'attr_01'}
+            )
 
         @dataclass
         class NestedDataclass(NonBlockingValidationDataclass):
-            nested_field_01: str = field(default=None, metadata={
-                'validator': BasicStringFieldValidator})                                                                  # CORRECT: Validator present, NO 'input_field' BUT key with the same name IS in input_data
+            nested_field_01: str = field(
+                default=None,
+                metadata={'validator': BasicStringFieldValidator}
+            )                                                                  # CORRECT: Validator present, NO 'input_field' BUT key with the same name IS in input_data
             nested_field_02: DoubleNestedDataclass = DoubleNestedDataclass
 
         @dataclass
         class DataclassForFormatterCorrect(NonBlockingValidationDataclass):
-            attr_01: str = field(default=None, metadata={
-                'validator': BasicStringFieldValidator})                                                                  # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
-            attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_01'})# CORRECT: both attributes present, input field matches the attr name
+            attr_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})                                                                  # CORRECT: validator present, NO 'input_field' BUT key with the same name IS in input_data
+            attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_04'})# CORRECT: both attributes present, input field matches the attr name
             attr_03: NestedDataclass = NestedDataclass
 
         data = {
