@@ -204,3 +204,58 @@ class TestFormatting(TestCase):
 
         result_dataclass = DataclassForFormatterCorrect.from_dict(data)
         self.assertIsInstance(result_dataclass, DataclassForFormatterCorrect)
+
+
+class TestValidation(TestCase):
+    @staticmethod
+    def extract_verbose_errors_from_exception_groups(context):
+        return tuple(exc.args[0] for exc in context.exception.exceptions)
+
+    def test_dataclass__field_validation_thorough_custom_validator_failed__should_raise_validation_errors(self):
+        """
+        All fields are formatter correctly, fields fail validation.
+        """
+        @dataclass
+        class DataclassForFormatterErrors(NonBlockingValidationDataclass):
+            attr_01: str = field(default=None, metadata={'validator': BasicIntFieldValidator})                          # CORRECT: validator present, NO 'input_field' AND but key with the same name IS in input_data
+            attr_02: dict = field(default=None, metadata={'validator': BasicDictFieldValidator, 'input_field': 'attr_06'}) # CORRECT: both attributes present, input field matches the attr name
+
+        EXPECTED_ERRORS = (
+            "Field: attr_01 raised ValidationError. Value: 'example string' is not of type: <class 'int'>",
+            "Field: attr_02 raised ValidationError. Value: '3' is not of type: <class 'dict'>"
+        )
+
+        data = {
+            'attr_01': 'example string',
+            'attr_02': {'example_key': 'example_value'},
+            'attr_04': {'example_key': 'example_value'},
+            'attr_07': {'example_key': 'example_value'},
+            'attr_06': 3,
+        }
+
+        with self.assertRaises(ValidationExceptionGroup) as context:
+            DataclassForFormatterErrors.from_dict(data)
+
+        self.assertEqual(EXPECTED_ERRORS, self.extract_verbose_errors_from_exception_groups(context))
+
+
+    def test_dataclass__field_validation_thorough_custom_validator_successful__should_return_dataclass_instance(self):
+        """
+        All fields are formatter correctly, fields pass validation.
+        """
+        @dataclass
+        class DataclassForFormatterCorrect(NonBlockingValidationDataclass):
+            attr_01: str = field(default=None, metadata={'validator': BasicStringFieldValidator})                          # CORRECT: validator present, NO 'input_field' AND but key with the same name IS in input_data
+            attr_02: dict = field(default=None, metadata={'validator': BasicIntFieldValidator, 'input_field': 'attr_06'}) # CORRECT: both attributes present, input field matches the attr name
+
+
+        data = {
+            'attr_01': 'example string',
+            'attr_02': {'example_key': 'example_value'},
+            'attr_04': {'example_key': 'example_value'},
+            'attr_07': {'example_key': 'example_value'},
+            'attr_06': 3,
+        }
+
+        result_dataclass = DataclassForFormatterCorrect.from_dict(data)
+        self.assertIsInstance(result_dataclass, DataclassForFormatterCorrect)
