@@ -1,24 +1,9 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, field
 from typing import List, Any, Type
 
 from rest_framework.exceptions import ValidationError
 
-
-class ValidationExceptionGroup(ExceptionGroup):
-    """Custom validation class for NonBlockingValidationDataclass class"""
-
-
-class AttrValidator(ABC):
-
-    def __init__(self, value, field_name: str):
-        self.value = value
-        self.field_name = field_name
-
-    def __call__(self, type: Type, *args, **kwargs):
-        if not isinstance(self.value, type):
-            raise ValidationError(f"Field: {self.field_name} raised ValidationError. "
-                                  f"Value: '{self.value}' is not of type: {type}")
+from validators import ValidationExceptionGroup, AttrValidator
 
 
 @dataclass
@@ -56,30 +41,6 @@ class NonBlockingValidationDataclass:
 
         return obj_dict
 
-    # @staticmethod
-    # def flat_dict_only_leaf_values(d):
-    #     """
-    #     Flatten the dict to only have leaf values:
-    #     data = {                                              data = {
-    #         'field_01': 'Example',                                'field_01': 'Example',
-    #         'field_02': 10,                                       'field_02': 10,
-    #         'field_03': {                                         'nested_field_01': 'Example',
-    #             'nested_field_01': 'Example',       =>            'nested_field_02': 10,
-    #             'nested_field_02': 10                             'field_04': [0, 1, 2]
-    #         },                                                }
-    #         'field_04': [0, 1, 2]
-    #     }
-    #     """
-    #     def _flatten_dict(d):
-    #         items = []
-    #         for k, v in d.items():
-    #             if isinstance(v, dict):
-    #                 items.extend(_flatten_dict(v).items())
-    #             else:
-    #                 items.append((k, v))
-    #         return dict(items)
-    #
-    #     return _flatten_dict(d)
     @classmethod
     def flatten_list_recursive(cls, list_to_flatten: List[Any]) -> List[Any]:
         """
@@ -126,7 +87,6 @@ class NonBlockingValidationDataclass:
             ]
             field_formatting_errors.extend(nested_field_formatting_errors)
 
-        #TODO: Add validation though custom validator
         #TODO: Make custom Validator optional - use strict type validation in validator not included
         return field_formatting_errors
 
@@ -158,6 +118,18 @@ class NonBlockingValidationDataclass:
                 value = dict_data.get(field_name)
 
             validator: AttrValidator = field.metadata.get('validator')
+            field_type: Type = field.type
+
+            # Typing on dataclass field must match the type included in custom validator if both present
+            if validator and field_type:
+                validator_type = getattr(validator, 'type', None)
+                if validator_type != field_type:
+                    validation_errors.append(
+                        ValidationError(
+                            f"Field type: {field_type} does not match custom AttrValidator type: {validator_type}"
+                        )
+                    )
+
             if validator:
                 try:
                     validator(value, field_name)()
